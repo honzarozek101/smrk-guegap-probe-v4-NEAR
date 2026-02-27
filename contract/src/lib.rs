@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // SMRK-GUEGAP Probe v4 — NEAR Confirmation Tier
-//
+// Copyright (c) 2026 101research.group  — All Rights Reserved.
 // probe_version : smrk-guegap-near-v1
 // N             : 32  (confirmation; spec N=512 → scaled for gas budget)
 // Role          : Second-layer confirmation of ICP screening results
