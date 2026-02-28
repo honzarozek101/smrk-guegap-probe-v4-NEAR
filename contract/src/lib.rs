@@ -31,13 +31,13 @@ const H2_MIN_GAP: f64 = 1e-4;            // Δ1 ≥ 1×10⁻⁴
 const BULK_I0: usize  = 6;               // ⌊0.2·32⌋
 const BULK_I1: usize  = 23;              // ⌊0.8·32⌋ − 2
 
-// FIX-7: input size guard — prevents gas/compute grief
+
 const MAX_INPUT_BYTES: usize = 4_096;
 
-// FIX-6: input_len sanity bounds
+
 const MAX_INPUT_LEN: u32 = 4_096;
 
-// Probe + contract version strings — bump on every release
+
 const PROBE_VERSION:    &str = "smrk-guegap-near-v3";
 const CONTRACT_VERSION: &str = "0.3.0";
 
@@ -114,9 +114,6 @@ fn build_smrk_matrix(kappa: f64, lam: f64, phi_offset: f64) -> Matrix {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Cyclic complex Jacobi eigenvalue solver  (§6.12)
-//
-// FIX-8: Returns Result<[f64; NMAT], String> instead of panicking on NaN.
-//        Caller (compute_smrk) propagates Err → run_confirmation saves Failed.
 // ══════════════════════════════════════════════════════════════════════════════
 
 fn jacobi_eigen(h_in: &Matrix) -> Result<[f64; NMAT], String> {
@@ -178,7 +175,7 @@ fn jacobi_eigen(h_in: &Matrix) -> Result<[f64; NMAT], String> {
         }
     }
 
-    // FIX-8: NaN → Err instead of panic. Saves audit trail.
+    
     for i in 0..NMAT {
         if a[i][i].is_nan() {
             return Err(format!(
@@ -197,9 +194,6 @@ fn jacobi_eigen(h_in: &Matrix) -> Result<[f64; NMAT], String> {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SMRK observables  (spec §3)
-//
-// FIX-8: Returns Result<SmrkResult, String> — Err propagated to caller.
-// PERF-1: Called ONCE per confirmation. SmrkResult shared by both JSON builders.
 // ══════════════════════════════════════════════════════════════════════════════
 
 struct SmrkResult {
@@ -267,7 +261,7 @@ fn compute_anchor_commitment(run_id: &str, commit_hash_hex: &str, plateau_flag: 
     sha256_raw(&data)
 }
 
-// FIX-6: validate that a caller-supplied SHA-256 hex string is well-formed.
+
 // Returns Err(message) so the caller can assert! with a meaningful message.
 fn validate_sha256_hex(s: &str) -> Result<(), String> {
     if s.len() != 64 {
@@ -320,9 +314,8 @@ fn math_payload_from_result(res: &SmrkResult, input_sha256_hex: &str) -> (Vec<u8
 }
 
 /// Audit output JSON — adds deployment metadata.
-///
-/// FIX-1: code_hash_hex + block_height are parameters captured at confirmation
-///        time and stored in JobRecord. Never read from live env::* here.
+
+
 fn audit_json_from_result(
     res:              &SmrkResult,
     input_sha256_hex: &str,
@@ -375,10 +368,8 @@ pub enum JobStatus { Queued, Running, Done, Failed }
 pub enum AnchorStatus { Pending, Recorded, Verified, Failed }
 
 /// State stored per job.
-///
-/// FIX-4: h1_pass, h2_pass, r_mean, delta1, h1_h2_proxy stored at confirmation.
-/// FIX-1: confirmed_block_height, confirmed_code_hash_hex stored at confirmation.
-/// FIX-2: raw input bytes NOT stored. Only input_sha256_hex + input_len.
+
+
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct JobRecord {
@@ -387,7 +378,7 @@ pub struct JobRecord {
     pub submitted_by:        AccountId,
     pub status:              JobStatus,
 
-    // Input commitment — raw bytes never stored (FIX-2)
+    // Input commitment — raw bytes never stored
     pub input_sha256_hex:    String,
     pub input_len:           u32,
 
@@ -401,14 +392,14 @@ pub struct JobRecord {
     pub commit_hash_hex:     Option<String>,  // = output_sha256_hex, used in anchor formula
     pub error:               Option<String>,
 
-    // FIX-4: cached spectral result — returned by "Already confirmed" branch
+   
     pub h1_h2_proxy:         Option<String>,  // "pass" | "fail"
     pub h1_pass:             Option<bool>,
     pub h2_pass:             Option<bool>,
     pub r_mean:              Option<f64>,
     pub delta1:              Option<f64>,
 
-    // FIX-1: env snapshot at confirmation time — used by verify_output()
+  
     pub confirmed_block_height:   Option<u64>,
     pub confirmed_code_hash_hex:  Option<String>,
 
@@ -535,11 +526,8 @@ impl SmrkGuegapContract {
     }
 
     // ── Job submission ────────────────────────────────────────────────────────
-    //
-    // FIX-2: #[payable]. Raw input NOT stored. Only hash + len.
-    // FIX-5: storage cost via env::storage_byte_cost() — correct on any network.
-    // FIX-6: input_sha256_hex validated: length 64, chars [0-9a-f], len > 0.
-    // Idempotent: duplicate hash returns existing record, refunds deposit.
+ 
+   
 
     #[payable]
     pub fn submit_job(
@@ -590,13 +578,13 @@ impl SmrkGuegapContract {
             math_sha256_hex:      None,
             commit_hash_hex:      None,
             error:                None,
-            h1_h2_proxy:          None,   // FIX-4
-            h1_pass:              None,   // FIX-4
-            h2_pass:              None,   // FIX-4
-            r_mean:               None,   // FIX-4
-            delta1:               None,   // FIX-4
-            confirmed_block_height:  None,  // FIX-1
-            confirmed_code_hash_hex: None,  // FIX-1
+            h1_h2_proxy:          None,   
+            h1_pass:              None,   
+            h2_pass:              None,   
+            r_mean:               None,  
+            delta1:               None,   /
+            confirmed_block_height:  None,  
+            confirmed_code_hash_hex: None,  
             anchor_commitment_hex: None,
             kaspa_txid:           None,
             anchor_status:        None,
@@ -607,7 +595,7 @@ impl SmrkGuegapContract {
         let storage_after = env::storage_usage();
         let storage_used  = storage_after.saturating_sub(storage_before);
 
-        // FIX-5: runtime storage cost — correct on testnet, mainnet, localnet
+       
         let byte_cost    = env::storage_byte_cost().as_yoctonear();
         let required     = storage_used as u128 * byte_cost;
         let attached     = env::attached_deposit().as_yoctonear();
@@ -633,15 +621,10 @@ impl SmrkGuegapContract {
     }
 
     // ── NEAR confirmation ─────────────────────────────────────────────────────
-    //
-    // PERF-1: single compute_smrk() call.
-    // FIX-1:  env snapshot stored in JobRecord.
-    // FIX-4:  h1_pass/h2_pass/r_mean/delta1 stored in JobRecord.
-    // FIX-7:  input size capped at MAX_INPUT_BYTES.
-    // FIX-8:  compute_smrk() returning Err → JobStatus::Failed saved, no panic.
+   
 
     pub fn run_confirmation(&mut self, run_id: String, input: Vec<u8>) -> ConfirmResp {
-        // FIX-7: guard against oversized input before any computation
+      
         assert!(
             input.len() <= MAX_INPUT_BYTES,
             "input length {} exceeds MAX_INPUT_BYTES {}.", input.len(), MAX_INPUT_BYTES
@@ -652,7 +635,7 @@ impl SmrkGuegapContract {
             None    => return fail_confirm(run_id, "Job not found. Call submit_job first."),
         };
 
-        // FIX-2: verify supplied input matches committed hash
+        
         let supplied_hash = hex::encode(sha256_raw(&input));
         if supplied_hash != job.input_sha256_hex {
             return fail_confirm(run_id,
@@ -660,7 +643,7 @@ impl SmrkGuegapContract {
                  Supply the exact bytes used when calling submit_job.");
         }
 
-        // FIX-4: "Already confirmed" returns cached spectral values — not constants
+        
         if job.status == JobStatus::Done {
             return ConfirmResp {
                 ok:             true,
@@ -684,15 +667,15 @@ impl SmrkGuegapContract {
 
         job.status = JobStatus::Running;
 
-        // FIX-1: capture env snapshot at this block — stored for verify_output()
+       
         let code_hash_hex = hex::encode(env::code_hash());
         let block_height  = env::block_height();
 
-        // PERF-1: single Jacobi run — FIX-8: handle Err without panic
+       
         let res = match compute_smrk(&input) {
             Ok(r)  => r,
             Err(e) => {
-                // FIX-8: save Failed with error message → audit trail preserved
+                
                 job.status = JobStatus::Failed;
                 job.error  = Some(e.clone());
                 self.jobs.insert(run_id.clone(), job);
@@ -700,7 +683,7 @@ impl SmrkGuegapContract {
             }
         };
 
-        // Build canonical JSON outputs
+        
         let (_, math_hash)    = math_payload_from_result(&res, &job.input_sha256_hex);
         let math_sha_hex      = hex::encode(math_hash);
         let (_, audit_hash)   = audit_json_from_result(
@@ -708,14 +691,14 @@ impl SmrkGuegapContract {
         );
         let out_sha_hex = hex::encode(audit_hash);
 
-        // PERF-2 + FIX-4: derive all result fields from res booleans
+        
         let h1_pass     = res.h1_pass;
         let h2_pass     = res.h2_pass;
         let h1h2_str    = if h1_pass && h2_pass { "pass" } else { "fail" };
         let r_mean      = res.r_mean;
         let delta1      = res.delta1;
 
-        // FIX-4: persist spectral result
+        
         job.h1_h2_proxy  = Some(h1h2_str.into());
         job.h1_pass      = Some(h1_pass);
         job.h2_pass      = Some(h2_pass);
@@ -785,7 +768,7 @@ impl SmrkGuegapContract {
         }
     }
 
-    /// Recomputes audit JSON using STORED block_height + code_hash_hex (FIX-1).
+    /// Recomputes audit JSON using STORED block_height + code_hash_hex 
     /// Matches on same deployment; intentionally differs after redeployment.
     pub fn verify_output(&self, run_id: String, input: Vec<u8>) -> VerifyResp {
         assert!(input.len() <= MAX_INPUT_BYTES,
@@ -802,7 +785,7 @@ impl SmrkGuegapContract {
                 message: "No output_sha256_hex yet. Run run_confirmation first.".into(),
                 stored_hex: None, computed_hex: None },
         };
-        // FIX-1: use stored env snapshot, NOT live env::*
+        
         let code_hash_hex = match &job.confirmed_code_hash_hex {
             Some(h) => h.clone(),
             None    => return VerifyResp { ok: false, matches: false,
@@ -877,22 +860,21 @@ then call record_kaspa_txid(run_id, txid). Payload: {}", hex
 
     /// Step 2 — record Kaspa txid after broadcast.
     ///
-    /// FIX-3: one-time write + caller ACL.
-    /// FIX-9: state-machine guard — anchor_status must be Pending.
+   
     pub fn record_kaspa_txid(&mut self, run_id: String, kaspa_txid: String) -> bool {
         let mut job = match self.jobs.get(&run_id) {
             Some(j) => j.clone(),
             None    => return false,
         };
 
-        // FIX-9: state machine — must be Pending
+      
         assert!(
             job.anchor_status == Some(AnchorStatus::Pending),
             "anchor_status must be Pending. Call anchor_job() first, \
              and do not call record_kaspa_txid() twice."
         );
 
-        // FIX-3(a): one-time write
+       
         assert!(
             job.kaspa_txid.is_none(),
             "kaspa_txid already recorded. Cannot overwrite."
