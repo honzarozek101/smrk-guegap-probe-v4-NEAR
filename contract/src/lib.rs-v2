@@ -38,7 +38,7 @@ const PROBE_VERSION:    &str = "smrk-guegap-near-v3";
 const CONTRACT_VERSION: &str = "0.3.0";
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Complex arithmetic  (stack-allocated, no alloc)
+// Complex arithmetic (stack-allocated, libm for determinism)
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[derive(Clone, Copy)]
@@ -47,16 +47,20 @@ struct C64 { re: f64, im: f64 }
 impl C64 {
     const ZERO: Self = Self { re: 0.0, im: 0.0 };
     fn conj(self)                -> Self { Self { re: self.re, im: -self.im } }
-    fn norm(self)                -> f64  { (self.re * self.re + self.im * self.im).sqrt() }
+    
+    // Použití libm pro deterministické výpočty
+    fn norm(self)                -> f64  { libm::sqrt(self.re * self.re + self.im * self.im) }
     fn scale(self, s: f64)       -> Self { Self { re: self.re * s, im: self.im * s } }
-    fn arg(self)                 -> f64  { self.im.atan2(self.re) }
-    fn polar(r: f64, theta: f64) -> Self { Self { re: r * theta.cos(), im: r * theta.sin() } }
+    fn arg(self)                 -> f64  { libm::atan2(self.im, self.re) }
+    fn polar(r: f64, theta: f64) -> Self { Self { re: r * libm::cos(theta), im: r * libm::sin(theta) } }
     fn is_nan(self)              -> bool { self.re.is_nan() || self.im.is_nan() }
 }
+
 impl std::ops::Add for C64 {
     type Output = Self;
     fn add(self, o: Self) -> Self { Self { re: self.re + o.re, im: self.im + o.im } }
 }
+
 impl std::ops::Mul for C64 {
     type Output = Self;
     fn mul(self, o: Self) -> Self {
@@ -86,7 +90,7 @@ fn build_smrk_matrix(kappa: f64, lam: f64, phi_offset: f64) -> Matrix {
     let mut h = [[C64::ZERO; NMAT]; NMAT];
 
     for n in 0..NMAT {
-        h[n][n] = C64 { re: lam * ((n + 2) as f64).ln(), im: 0.0 };
+        h[n][n] = C64 { re: lam * libm::log((n + 2) as f64), im: 0.0 };
     }
 
     for n in 0..NMAT {
@@ -95,7 +99,8 @@ fn build_smrk_matrix(kappa: f64, lam: f64, phi_offset: f64) -> Matrix {
         for m in 0..M_SHIFTS {
             let pm    = PRIMES[m];
             let sigma = (n + pm) % NMAT;
-            let amp   = kappa / (1.0 + pm as f64).ln().powf(S_EXP) * (1.0 + ETA * lv);
+            // libm::pow a libm::log namísto .powf a .ln()
+            let amp   = kappa / libm::pow(libm::log(1.0 + pm as f64), S_EXP) * (1.0 + ETA * lv);
             let phi   = 2.0 * PI * GOLDEN * n1 + phi_offset;
             let w     = C64::polar(amp, phi);
             h[n][sigma] = h[n][sigma] + w;
@@ -134,11 +139,11 @@ fn jacobi_eigen(h_in: &Matrix) -> Result<[f64; NMAT], String> {
                 let phi = apq.arg();
                 let tau = (a[q][q].re - a[p][p].re) / (2.0 * r);
                 let t   = if tau >= 0.0 {
-                    1.0 / (tau + (1.0 + tau * tau).sqrt())
+                    1.0 / (tau + libm::sqrt(1.0 + tau * tau))
                 } else {
-                    1.0 / (tau - (1.0 + tau * tau).sqrt())
+                    1.0 / (tau - libm::sqrt(1.0 + tau * tau))
                 };
-                let c   = 1.0 / (1.0 + t * t).sqrt();
+                let c   = 1.0 / libm::sqrt(1.0 + t * t);
                 let s   = t * c;
                 let ep  = C64::polar(1.0,  phi);
                 let enp = C64::polar(1.0, -phi);
@@ -216,7 +221,7 @@ fn compute_smrk(input: &[u8]) -> Result<SmrkResult, String> {
 
     Ok(SmrkResult {
         eigs, delta1, r_mean, r_count,
-        h1_pass: (r_mean - R_GUE).abs() <= H1_BAND,
+        h1_pass: libm::fabs(r_mean - R_GUE) <= H1_BAND,
         h2_pass: delta1 >= H2_MIN_GAP,
     })
 }
