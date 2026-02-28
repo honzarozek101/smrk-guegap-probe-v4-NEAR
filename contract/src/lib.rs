@@ -710,8 +710,8 @@ impl SmrkGuegapContract {
         job.math_sha256_hex      = Some(math_sha_hex.clone());
         job.commit_hash_hex      = Some(out_sha_hex);
         job.error                = None;
-        job.confirmed_block_height  = Some(block_height);   // FIX-1
-        job.confirmed_code_hash_hex = Some(code_hash_hex.clone()); // FIX-1
+        job.confirmed_block_height  = Some(block_height);   
+        job.confirmed_code_hash_hex = Some(code_hash_hex.clone()); 
 
         self.jobs.insert(run_id.clone(), job);
 
@@ -870,7 +870,7 @@ then call record_kaspa_txid(run_id, txid). Payload: {}", hex
       
         assert!(
             job.anchor_status == Some(AnchorStatus::Pending),
-            "anchor_status must be Pending. Call anchor_job() first, \
+            "anchor_status must be Pending. Call anchor_job() first, 
              and do not call record_kaspa_txid() twice."
         );
 
