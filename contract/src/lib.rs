@@ -4,52 +4,6 @@
 // probe_version : smrk-guegap-near-v3
 // N             : 32  (confirmation; spec N=512 → scaled for gas budget)
 // Role          : Second-layer confirmation of ICP screening results
-//
-// ── Changelog from v0.2.0 (smrk-guegap-near-v2) ────────────────────────────
-//
-//   FIX-4  "Already confirmed" branch returned hardcoded pass/true
-//          JobRecord now stores h1_pass, h2_pass, r_mean, delta1, h1_h2_proxy
-//          at confirmation time. "Already confirmed" branch returns stored
-//          spectral values — never hardcoded constants.
-//
-//   FIX-5  STORAGE_PRICE_PER_BYTE was hardcoded (cross-network fragility)
-//          Now uses env::storage_byte_cost() at runtime — always correct
-//          for the network the contract is deployed on.
-//
-//   FIX-6  submit_job() accepted arbitrary input_sha256_hex without validation
-//          Now validates: length == 64, chars ∈ [0-9a-f], lowercase canonical.
-//          Also validates: input_len > 0 and input_len <= MAX_INPUT_LEN.
-//
-//   FIX-7  run_confirmation() accepted unbounded input Vec<u8>
-//          Now asserts input.len() <= MAX_INPUT_BYTES (4096).
-//          Prevents gas grief / compute grief from oversized inputs.
-//
-//   FIX-8  NaN in jacobi_eigen() caused panic → revert, no audit trail
-//          jacobi_eigen() now returns Result<[f64;N], String>.
-//          compute_smrk() returns Result<SmrkResult, String>.
-//          run_confirmation() catches Err: sets JobStatus::Failed + error
-//          field, saves to state, returns ConfirmResp { ok: false }.
-//          Audit trail always present, even for degenerate inputs.
-//
-//   FIX-9  record_kaspa_txid() had no state-machine guard
-//          Now asserts anchor_status == Some(Pending) before writing txid.
-//          Enforces: anchor_job() must precede record_kaspa_txid().
-//
-// ── Carried from v0.2.0 ───────────────────────────────────────────────────────
-//
-//   FIX-1  verify_output() used live env::block_height()/code_hash() → mismatch
-//   FIX-2  Storage griefing: submit_job #[payable], input NOT stored on-chain
-//   FIX-3  record_kaspa_txid open write: one-time + caller ACL
-//   PERF-1 Single Jacobi per confirmation (SmrkResult passed to both builders)
-//   PERF-2 h1_h2_proxy from bool, not string parsing
-//   SAFE-1 NaN guard (now returns Result instead of panic — see FIX-8)
-//   API-1  compare_icp_reference() (renamed from verify_icp_cross_chain)
-//
-// ── NEAR gas budget ───────────────────────────────────────────────────────────
-//   300 TGas / tx. Jacobi N=32, 300 sweeps ≈ 10M f64 ops ≈ ~30 TGas → safe.
-//   Single Jacobi per confirmation (PERF-1).
-//
-// Spec refs: §2 (operator), §3 (observables), §4 (acceptance), §D.1.3 (anchor)
 // ══════════════════════════════════════════════════════════════════════════════
 
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
